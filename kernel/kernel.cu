@@ -12,6 +12,8 @@
 #define Block 1
 #define FULL_WARP_MASK 0xFFFFFFFF
 
+using std::cout;
+using std::endl;
 
 template <class T>
 __device__ T warp_reduce(T val){
@@ -109,20 +111,47 @@ __device__ inline op_scalar_fn get_fn_kernel(op_t op) {
 __global__ void spmm(const csr_t* __restrict__ obj1, float* x, float * y, op_t op, const bool reverse, const bool norm, const int dim) 
 {
     //TODO
+    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    if (row >= obj1 -> v)
+        return;
+
+    float * row_ptr = x + dim * row;
+    float * output = y + dim * row;
+
+    int degree = obj1 -> get_degree (row);
+    if (reverse && norm){
+        for (vid_t i = 0; i < dim; i++)
+            row_ptr [i] /= degree;
+    }
+
+    vid_t * nebrs;
+    degree = obj1 -> get_nebrs(row, nebrs);
+    for (int i = 0; i < degree; i++){
+        float * nebrs_ptr = x + dim * nebrs[i];
+        for (vid_t j = 0; j < dim; j++){
+            output[j] += nebrs_ptr[j];
+        }
+    }
+
+    if((!reverse) && norm){
+        for (vid_t i = 0; i < dim; i++)
+            output[i]/=degree;
+    }
 }
 
 //warp per row (best)
-__global__ void spmm_warp(const csr_t* __restrict__ obj1, float* x, float * y, op_t op, const bool reverse, const bool norm, const int dim)
-{
-    //TODO
-}
+//__global__ void spmm_warp(const csr_t* __restrict__ obj1, float* x, float * y, op_t op, const bool reverse, const bool norm, const int dim)
+// {
+//     //TODO
+
+// }
 
 void invoke_spmm(csr_t * obj1, array2d_t < float > & x1, array2d_t < float > & y1, op_t op, bool reverse, bool norm, int dim) {
-    int warp_size=32;
+    //int warp_size=32;
     int block_size=1024;
-    int nBlocks =  0; // TODO 
-    spmm_warp <<<nBlocks,block_size>>> (obj1, x1.data_ptr, y1.data_ptr, op, true, true, dim);
-
+    int nBlocks =  ceil (obj1->v/block_size); // TODO 
+    //spmm_warp <<<nBlocks,block_size>>> (obj1, x1.data_ptr, y1.data_ptr, op, true, true, dim);
+    spmm <<<nBlocks,block_size>>> (obj1, x1.data_ptr, y1.data_ptr, op, reverse, norm, dim);
     cudaDeviceSynchronize();
 }
 
