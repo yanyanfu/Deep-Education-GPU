@@ -149,7 +149,7 @@ __global__ void spmm(const csr_t* __restrict__ obj1, float* x, float * y, op_t o
 void invoke_spmm(csr_t * obj1, array2d_t < float > & x1, array2d_t < float > & y1, op_t op, bool reverse, bool norm, int dim) {
     //int warp_size=32;
     int block_size=1024;
-    int nBlocks =  ceil (obj1->v/()block_size); // TODO 
+    int nBlocks =  ceil (obj1->v/(float)block_size); // TODO 
     //spmm_warp <<<nBlocks,block_size>>> (obj1, x1.data_ptr, y1.data_ptr, op, true, true, dim);
     spmm <<<nBlocks,block_size>>> (obj1, x1.data_ptr, y1.data_ptr, op, reverse, norm, dim);
     cudaDeviceSynchronize();
